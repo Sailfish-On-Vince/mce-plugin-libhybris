@@ -32,6 +32,7 @@
 #include "sysfs-led-binary.h"
 #include "sysfs-led-redgreen.h"
 #include "sysfs-led-white.h"
+#include "sysfs-led-vince.h"
 
 #include "plugin-logging.h"
 #include "plugin-config.h"
@@ -300,6 +301,10 @@ led_control_probe(led_control_t *self)
     /* The binary backend needs just one directory
      * that has 'brightness' control file. */
     { "binary", led_control_binary_probe },
+
+    /* The vince requires  'brightness', 'max_brightness' and 'blink'
+     * control files to be present for red, green and blue channels. */
+    { "vince", led_control_vince_probe },
   };
 
   bool   ack  = false;

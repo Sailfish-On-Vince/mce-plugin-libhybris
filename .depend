@@ -182,6 +182,24 @@ sysfs-led-htcvision.pic.o:\
 	sysfs-led-util.h\
 	sysfs-val.h\
 
+sysfs-led-vince.o:\
+	sysfs-led-vince.c\
+	plugin-config.h\
+	plugin-logging.h\
+	sysfs-led-vince.h\
+	sysfs-led-main.h\
+	sysfs-led-util.h\
+	sysfs-val.h\
+
+sysfs-led-vince.pic.o:\
+	sysfs-led-vince.c\
+	plugin-config.h\
+	plugin-logging.h\
+	sysfs-led-vince.h\
+	sysfs-led-main.h\
+	sysfs-led-util.h\
+	sysfs-val.h\
+
 sysfs-led-main.o:\
 	sysfs-led-main.c\
 	plugin-config.h\
@@ -192,6 +210,7 @@ sysfs-led-main.o:\
 	sysfs-led-f5121.h\
 	sysfs-led-hammerhead.h\
 	sysfs-led-htcvision.h\
+	sysfs-led-vince.h\
 	sysfs-led-main.h\
 	sysfs-led-redgreen.h\
 	sysfs-led-util.h\
@@ -208,6 +227,7 @@ sysfs-led-main.pic.o:\
 	sysfs-led-f5121.h\
 	sysfs-led-hammerhead.h\
 	sysfs-led-htcvision.h\
+	sysfs-led-vince.h\
 	sysfs-led-main.h\
 	sysfs-led-redgreen.h\
 	sysfs-led-util.h\
@@ -287,4 +307,3 @@ sysfs-val.pic.o:\
 	sysfs-val.c\
 	plugin-logging.h\
 	sysfs-val.h\
-
