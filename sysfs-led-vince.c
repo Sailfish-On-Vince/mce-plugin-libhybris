@@ -339,8 +339,9 @@ led_control_vince_probe(led_control_t *self)
     self->value  = led_control_vince_value_cb;
     self->close  = led_control_vince_close_cb;
 
-    /* Prefer to use the built-in soft-blinking */
-    self->can_breathe = false;
+    /* We can use sw breathing logic to simulate hw blinking */
+    self->can_breathe = true;
+    self->breath_type = LED_RAMP_HARD_STEP;
 
     if( self->use_config )
         ack = led_control_vince_dynamic_probe(channel);
