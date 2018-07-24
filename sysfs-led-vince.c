@@ -50,43 +50,34 @@
 
 typedef struct
 {
-    const char *max_brightness;
-    const char *brightness;
-    const char *blink;
+    const char *max_brightness;    // R
+    const char *brightness;    // W
 } led_paths_vince_t;
 
 typedef struct
 {
     sysfsval_t *cached_max_brightness;
     sysfsval_t *cached_brightness;
-    sysfsval_t *cached_blink;
-
-    int         control_value;
-    bool        control_blink;
-
 } led_channel_vince_t;
 
 /* ------------------------------------------------------------------------- *
  * ONE_CHANNEL
  * ------------------------------------------------------------------------- */
 
-static void        led_channel_vince_init        (led_channel_vince_t *self);
-static void        led_channel_vince_close       (led_channel_vince_t *self);
-static bool        led_channel_vince_probe       (led_channel_vince_t *self, const led_paths_vince_t *path);
-static void        led_channel_vince_set_value   (led_channel_vince_t *self, int value);
-static void        led_channel_vince_set_blink   (led_channel_vince_t *self, int on_ms, int off_ms);
-
+static void led_channel_vince_init      (led_channel_vince_t *self);
+static void led_channel_vince_close     (led_channel_vince_t *self);
+static bool led_channel_vince_probe     (led_channel_vince_t *self, const led_paths_vince_t *path);
+static void led_channel_vince_set_value (const led_channel_vince_t *self, int value);
 
 /* ------------------------------------------------------------------------- *
  * ALL_CHANNELS
  * ------------------------------------------------------------------------- */
 
-static void        led_control_vince_map_color   (int r, int g, int b, int *red, int *green);
-static void        led_control_vince_blink_cb    (void *data, int on_ms, int off_ms);
-static void        led_control_vince_value_cb    (void *data, int r, int g, int b);
-static void        led_control_vince_close_cb    (void *data);
+static void led_control_vince_map_color (int r, int g, int b, int *white);
+static void led_control_vince_value_cb  (void *data, int r, int g, int b);
+static void led_control_vince_close_cb  (void *data);
 
-bool               led_control_vince_probe       (led_control_t *self);
+bool        led_control_vince_probe     (led_control_t *self);
 
 /* ========================================================================= *
  * ONE_CHANNEL
@@ -97,10 +88,6 @@ led_channel_vince_init(led_channel_vince_t *self)
 {
     self->cached_max_brightness = sysfsval_create();
     self->cached_brightness     = sysfsval_create();
-    self->cached_blink          = sysfsval_create();
-
-    self->control_blink = false;
-    self->control_value = 0;
 }
 
 static void
@@ -111,34 +98,26 @@ led_channel_vince_close(led_channel_vince_t *self)
 
     sysfsval_delete(self->cached_brightness),
         self->cached_brightness = 0;
-
-    sysfsval_delete(self->cached_blink),
-        self->cached_blink = 0;
 }
 
 static bool
 led_channel_vince_probe(led_channel_vince_t *self,
-                           const led_paths_vince_t *path)
+                        const led_paths_vince_t *path)
 {
-    bool ack = false;
-     
-    if( !sysfsval_open_rw(self->cached_blink, path->blink) )
-        goto cleanup;
+    bool res = false;
 
     if( !sysfsval_open_rw(self->cached_brightness, path->brightness) )
         goto cleanup;
-#if 0 // TODO: make a QUIRK out of this
-    sysfsval_set(self->cached_max_brightness, 255);
-#endif
+
+    if( !sysfsval_open_ro(self->cached_max_brightness, path->max_brightness) )
+        goto cleanup;
+
     sysfsval_refresh(self->cached_max_brightness);
 
     if( sysfsval_get(self->cached_max_brightness) <= 0 )
         goto cleanup;
 
-    if( !sysfsval_open_rw(self->cached_brightness, path->brightness) )
-        goto cleanup;
-
-    ack = true;
+    res = true;
 
 cleanup:
 
@@ -146,88 +125,46 @@ cleanup:
     sysfsval_close(self->cached_max_brightness);
 
     /* On failure close the other files too */
-    if( !ack )
+    if( !res )
     {
         sysfsval_close(self->cached_brightness);
-        sysfsval_close(self->cached_blink);
     }
 
-    return ack;
+    return res;
 }
 
 static void
-led_channel_vince_set_value(led_channel_vince_t *self, int value)
+led_channel_vince_set_value(const led_channel_vince_t *self, int value)
 {
     value = led_util_scale_value(value,
                                  sysfsval_get(self->cached_max_brightness));
-    /* Ignore blinking requests while brightness is zero. */
-    // if( value <= 0 )
-        // self->control_blink = false;
-    if( self->control_blink ) {
-        sysfsval_set(self->cached_brightness, 0);
-        sysfsval_set(self->cached_blink, 1);
-    }
-    else {
-        sysfsval_set(self->cached_blink, 0);
-        sysfsval_set(self->cached_brightness, value);
-    }
-
-    return;
-}
-
-static void
-led_channel_vince_set_blink(led_channel_vince_t *self,
-                            int on_ms, int off_ms)
-{
-    /* The state machine at upper level adjusts blink setting first
-     * followed by brighthess setting - in vince modifying one will
-     * affect the other too and must thus be handled at the same
-     * time -> just cache the requested state. */
-    self->control_blink = (on_ms && off_ms);
+    sysfsval_set(self->cached_brightness, value);
 }
 
 /* ========================================================================= *
  * ALL_CHANNELS
  * ========================================================================= */
 
-#define vince_CHANNELS 2
+#define VINCE_CHANNELS 1
 
 static void
-led_control_vince_map_color(int r, int g, int b, int *red, int *green)
+led_control_vince_map_color(int r, int g, int b, int *white)
 {
-    /* If the pattern defines red and/or green intensities, those should
-     * be used. Otherwise make sure that requesting for blue only colour
-     * does not result in the led being turned off. */
-    if( r || g )
-    {
-        *red   = r;
-        *green = g;
-    }
-    else
-    {
-        *red   = b;
-        *green = b;
-    }
-}
-
-static void
-led_control_vince_blink_cb(void *data, int on_ms, int off_ms)
-{
-    led_channel_vince_t *channel = data;
-    led_channel_vince_set_blink(channel + 0, on_ms, off_ms);
-    led_channel_vince_set_blink(channel + 1, on_ms, off_ms);
+    /* Use maximum value from requested RGB value */
+    if( r < g ) r = g;
+    if( r < b ) r = b;
+    *white = r;
 }
 
 static void
 led_control_vince_value_cb(void *data, int r, int g, int b)
 {
-    led_channel_vince_t *channel = data;
-    int red   = 0;
-    int green = 0;
-    led_control_vince_map_color(r, g, b, &red, &green);
-    led_channel_vince_set_value(channel + 0, r);
-    led_channel_vince_set_value(channel + 1, g);
-    
+    const led_channel_vince_t *channel = data;
+
+    int white = 0;
+    led_control_vince_map_color(r, g, b, &white);
+
+    led_channel_vince_set_value(channel + 0, white);
 }
 
 static void
@@ -235,43 +172,27 @@ led_control_vince_close_cb(void *data)
 {
     led_channel_vince_t *channel = data;
     led_channel_vince_close(channel + 0);
-    led_channel_vince_close(channel + 1);
 }
-
 static bool
 led_control_vince_static_probe(led_channel_vince_t *channel)
 {
-    /** Sysfs control paths for RGB leds */
-    static const led_paths_vince_t vince_paths[][vince_CHANNELS] =
+    /** Sysfs control paths for vince leds */
+    static const led_paths_vince_t paths[][VINCE_CHANNELS] =
     {
-        // vince (Xiaomi Redmi note 5/5 plus)
+        // "vince (Xiaomi Redmi note 5/5 plus)"
         {
-            {
-                .max_brightness = "/sys/class/leds/red/max_brightness",
-                .brightness     = "/sys/class/leds/red/brightness",
-                .blink          = "/sys/class/leds/red/blink",
-            },
             {
                 .max_brightness = "/sys/class/leds/green/max_brightness",
                 .brightness     = "/sys/class/leds/green/brightness",
-                .blink          = "/sys/class/leds/green/blink",
             },
-            // {
-            //     .max_brightness = "/sys/class/leds/blue/max_brightness",
-            //     .brightness     = "/sys/class/leds/blue/brightness",
-            //     .blink          = "/sys/class/leds/blue/blink",
-            // },
         },
     };
 
     bool ack = false;
 
-    for( size_t i = 0; i < G_N_ELEMENTS(vince_paths); ++i ) {
-        if( led_channel_vince_probe(&channel[0], &vince_paths[i][0]) &&
-            led_channel_vince_probe(&channel[1], &vince_paths[i][1]) ) {
-            ack = true;
+    for( size_t i = 0; i < G_N_ELEMENTS(paths); ++i ) {
+        if( (ack = led_channel_vince_probe(channel+0, &paths[i][0])) )
             break;
-        }
     }
 
     return ack;
@@ -280,76 +201,72 @@ led_control_vince_static_probe(led_channel_vince_t *channel)
 static bool
 led_control_vince_dynamic_probe(led_channel_vince_t *channel)
 {
-  /* See inifiles/60-vince.ini for example */
-  static const objconf_t vince_conf[] =
-  {
-    OBJCONF_FILE(led_paths_vince_t, brightness,      Brightness),
-    OBJCONF_FILE(led_paths_vince_t, max_brightness,  MaxBrightness),
-    OBJCONF_FILE(led_paths_vince_t, blink,           Blink),
-    OBJCONF_STOP
-  };
+    static const objconf_t white_conf[] =
+    {
+        OBJCONF_FILE(led_paths_vince_t, brightness,     Brightness),
+        OBJCONF_FILE(led_paths_vince_t, max_brightness, MaxBrightness),
+        OBJCONF_STOP
+    };
 
-  static const char * const pfix[vince_CHANNELS] =
-  {
-    "Red", "Green"
-  };
+    static const char * const pfix[VINCE_CHANNELS] =
+    {
+        "Led",
+    };
 
-  bool ack = false;
+    bool ack = false;
 
-  led_paths_vince_t paths[vince_CHANNELS];
+    led_paths_vince_t paths[VINCE_CHANNELS];
 
-  memset(paths, 0, sizeof paths);
-  for( size_t i = 0; i < vince_CHANNELS; ++i )
-    objconf_init(vince_conf, &paths[i]);
+    memset(paths, 0, sizeof paths);
+    for( size_t i = 0; i < VINCE_CHANNELS; ++i )
+        objconf_init(white_conf, &paths[i]);
 
-  for( size_t i = 0; i < vince_CHANNELS; ++i )
-  {
-    if( !objconf_parse(vince_conf, &paths[i], pfix[i]) )
-      goto cleanup;
+    for( size_t i = 0; i < VINCE_CHANNELS; ++i ) {
+        if( !objconf_parse(white_conf, &paths[i], pfix[i]) )
+            goto cleanup;
 
-    if( !led_channel_vince_probe(channel+i, &paths[i]) )
-      goto cleanup;
-  }
+        if( !led_channel_vince_probe(channel+i, &paths[i]) )
+            goto cleanup;
+    }
 
-  ack = true;
+    ack = true;
 
 cleanup:
 
-  for( size_t i = 0; i < vince_CHANNELS; ++i )
-    objconf_quit(vince_conf, &paths[i]);
+    for( size_t i = 0; i < VINCE_CHANNELS; ++i )
+        objconf_quit(white_conf, &paths[i]);
 
-  return ack;
+    return ack;
 }
 
 bool
 led_control_vince_probe(led_control_t *self)
 {
-    static led_channel_vince_t channel[vince_CHANNELS];
 
-    bool ack = false;
+    static led_channel_vince_t channel[VINCE_CHANNELS];
 
-    led_channel_vince_init(channel+0);
-    led_channel_vince_init(channel+1);
-    // led_channel_vince_init(channel+2);
+    bool res = false;
+
+    led_channel_vince_init(channel + 0);
 
     self->name   = "vince";
     self->data   = channel;
     self->enable = 0;
-    self->blink  = led_control_vince_blink_cb;
     self->value  = led_control_vince_value_cb;
     self->close  = led_control_vince_close_cb;
 
-    /* Prefer to use the built-in soft-blinking */
-    self->can_breathe = false;
+    /* We can use sw breathing logic */
+    self->can_breathe = true;
+    self->breath_type = LED_RAMP_HARD_STEP;
 
     if( self->use_config )
-        ack = led_control_vince_dynamic_probe(channel);
+        res = led_control_vince_dynamic_probe(channel);
 
-    if( !ack )
-        ack = led_control_vince_static_probe(channel);
+    if( !res )
+        res = led_control_vince_static_probe(channel);
 
-    if( !ack )
+    if( !res )
         led_control_close(self);
 
-    return ack;
+    return res;
 }
