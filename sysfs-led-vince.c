@@ -81,6 +81,7 @@ static void        led_channel_vince_set_blink   (led_channel_vince_t *self, int
  * ALL_CHANNELS
  * ------------------------------------------------------------------------- */
 
+static void        led_control_vince_map_color   (int r, int g, int b, int *red, int *green);
 static void        led_control_vince_blink_cb    (void *data, int on_ms, int off_ms);
 static void        led_control_vince_value_cb    (void *data, int r, int g, int b);
 static void        led_control_vince_close_cb    (void *data);
@@ -155,35 +156,13 @@ cleanup:
 }
 
 static void
-led_channel_vince_set_value(const led_channel_vince_t *self, int value)
+led_channel_vince_set_value(led_channel_vince_t *self, int value)
 {
     value = led_util_scale_value(value,
                                  sysfsval_get(self->cached_max_brightness));
     /* Ignore blinking requests while brightness is zero. */
-    if( value <= 0 )
-        self->control_blink = false;
-    /* Logically it probably should be that:
-     * - writing blink=1 implies brightness=255
-     * - writing blink=0 implies brightness=0
-     * - writing brightness=n implies blink=0
-     *
-     * However it seems swithing between blinking and non-blinking
-     * modes can cause hiccups that vary from one device to another
-     * (stale sysfs values left behind, led stays off when it should
-     * be lit, ...)
-     *
-     * So the logic is arranged that before switching from static
-     * color to blinking, a brightness=0 is done before writing
-     * blink=0, and when swithing from blinking to static color, a
-     * blink=0 is done before writing brightness=0.
-     *
-     * Note that upper level state machine logic + caching of the
-     * assumed sysfs values means that these transitions are done in
-     * 3 steps (cancel previous mode, reset to black, switch to new
-     * mode) with pproximately SYSFS_LED_KERNEL_DELAY ms in between
-     * the steps.
-     */
-
+    // if( value <= 0 )
+        // self->control_blink = false;
     if( self->control_blink ) {
         sysfsval_set(self->cached_brightness, 0);
         sysfsval_set(self->cached_blink, 1);
@@ -211,7 +190,25 @@ led_channel_vince_set_blink(led_channel_vince_t *self,
  * ALL_CHANNELS
  * ========================================================================= */
 
-#define vince_CHANNELS 3
+#define vince_CHANNELS 2
+
+static void
+led_control_vince_map_color(int r, int g, int b, int *red, int *green)
+{
+    /* If the pattern defines red and/or green intensities, those should
+     * be used. Otherwise make sure that requesting for blue only colour
+     * does not result in the led being turned off. */
+    if( r || g )
+    {
+        *red   = r;
+        *green = g;
+    }
+    else
+    {
+        *red   = b;
+        *green = b;
+    }
+}
 
 static void
 led_control_vince_blink_cb(void *data, int on_ms, int off_ms)
@@ -219,16 +216,18 @@ led_control_vince_blink_cb(void *data, int on_ms, int off_ms)
     led_channel_vince_t *channel = data;
     led_channel_vince_set_blink(channel + 0, on_ms, off_ms);
     led_channel_vince_set_blink(channel + 1, on_ms, off_ms);
-    led_channel_vince_set_blink(channel + 2, on_ms, off_ms);
 }
 
 static void
 led_control_vince_value_cb(void *data, int r, int g, int b)
 {
     led_channel_vince_t *channel = data;
+    int red   = 0;
+    int green = 0;
+    led_control_vince_map_color(r, g, b, &red, &green);
     led_channel_vince_set_value(channel + 0, r);
     led_channel_vince_set_value(channel + 1, g);
-    led_channel_vince_set_value(channel + 2, b);
+    
 }
 
 static void
@@ -237,7 +236,6 @@ led_control_vince_close_cb(void *data)
     led_channel_vince_t *channel = data;
     led_channel_vince_close(channel + 0);
     led_channel_vince_close(channel + 1);
-    led_channel_vince_close(channel + 2);
 }
 
 static bool
@@ -258,11 +256,11 @@ led_control_vince_static_probe(led_channel_vince_t *channel)
                 .brightness     = "/sys/class/leds/green/brightness",
                 .blink          = "/sys/class/leds/green/blink",
             },
-            {
-                .max_brightness = "/sys/class/leds/blue/max_brightness",
-                .brightness     = "/sys/class/leds/blue/brightness",
-                .blink          = "/sys/class/leds/blue/blink",
-            },
+            // {
+            //     .max_brightness = "/sys/class/leds/blue/max_brightness",
+            //     .brightness     = "/sys/class/leds/blue/brightness",
+            //     .blink          = "/sys/class/leds/blue/blink",
+            // },
         },
     };
 
@@ -270,8 +268,7 @@ led_control_vince_static_probe(led_channel_vince_t *channel)
 
     for( size_t i = 0; i < G_N_ELEMENTS(vince_paths); ++i ) {
         if( led_channel_vince_probe(&channel[0], &vince_paths[i][0]) &&
-            led_channel_vince_probe(&channel[1], &vince_paths[i][1]) &&
-            led_channel_vince_probe(&channel[2], &vince_paths[i][2]) ) {
+            led_channel_vince_probe(&channel[1], &vince_paths[i][1]) ) {
             ack = true;
             break;
         }
@@ -294,7 +291,7 @@ led_control_vince_dynamic_probe(led_channel_vince_t *channel)
 
   static const char * const pfix[vince_CHANNELS] =
   {
-    "Red", "Green", "Blue"
+    "Red", "Green"
   };
 
   bool ack = false;
@@ -333,7 +330,7 @@ led_control_vince_probe(led_control_t *self)
 
     led_channel_vince_init(channel+0);
     led_channel_vince_init(channel+1);
-    led_channel_vince_init(channel+2);
+    // led_channel_vince_init(channel+2);
 
     self->name   = "vince";
     self->data   = channel;
