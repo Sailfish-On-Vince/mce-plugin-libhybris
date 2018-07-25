@@ -253,7 +253,8 @@ led_control_white_probe(led_control_t *self)
 
     /* We can use sw breathing logic */
     self->can_breathe = true;
-
+    self->breath_type = LED_RAMP_HARD_STEP;
+    
     if( self->use_config )
         res = led_control_white_dynamic_probe(channel);
 
