@@ -178,8 +178,8 @@ led_control_white_static_probe(led_channel_white_t *channel)
         // "Motorola Moto G (2nd gen)"
         {
             {
-                .max_brightness = "/sys/class/leds/white/max_brightness",
-                .brightness     = "/sys/class/leds/white/brightness",
+                .max_brightness = "/sys/class/leds/green/max_brightness",
+                .brightness     = "/sys/class/leds/green/brightness",
             },
         },
     };
