@@ -277,7 +277,7 @@ led_control_redgreen_probe(led_control_t *self)
 
     /* We can use sw breathing logic to simulate hw blinking */
     self->can_breathe = true;
-    self->breath_type = LED_RAMP_HARD_STEP;
+    // self->breath_type = LED_RAMP_HARD_STEP;
 
     if( self->use_config )
         res = led_control_redgreen_dynamic_probe(channel);
