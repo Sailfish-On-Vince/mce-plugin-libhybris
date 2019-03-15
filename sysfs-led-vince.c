@@ -268,14 +268,14 @@ led_control_vince_static_probe(led_channel_vince_t *channel)
                 .blink          = "/sys/class/leds/red/blink",
             },
             {
-                .max_brightness = "/sys/class/leds/green/max_brightness",
-                .brightness     = "/sys/class/leds/green/brightness",
-                .blink          = "/sys/class/leds/green/blink",
+                .max_brightness = "/sys/class/leds/red/max_brightness",
+                .brightness     = "/sys/class/leds/red/brightness",
+                .blink          = "/sys/class/leds/red/blink",
             },
             {
-                .max_brightness = "/sys/class/leds/blue/max_brightness",
-                .brightness     = "/sys/class/leds/blue/brightness",
-                .blink          = "/sys/class/leds/blue/blink",
+                .max_brightness = "/sys/class/leds/red/max_brightness",
+                .brightness     = "/sys/class/leds/red/brightness",
+                .blink          = "/sys/class/leds/red/blink",
             },
         },
     };
