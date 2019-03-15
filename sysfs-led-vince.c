@@ -168,7 +168,7 @@ led_channel_vince_set_value(led_channel_vince_t *self,
      * Since Xiaomi implemented 4095 level brightness in panel dtsi
      * while caf only have 255 level, we multiply 16 to brightness by default.
     */
-    sysfsval_set(self->cached_max_brightness, 255);
+
     value *= 16;
     value = (value < 0) ? 0 : (value < 255) ? value : 255;
     // value = led_util_scale_value(value,
