@@ -133,7 +133,7 @@ led_channel_vince_probe(led_channel_vince_t *self,
     /* The 'max_brightness' seems to be dynamic. Make an attempt
      * to set it to an artificially high value and assume that kernel
      * side will cap the value to the true maximum... */
-#if 0 // TODO: make a QUIRK out of this
+#if 1 // TODO: make a QUIRK out of this
     sysfsval_set(self->cached_max_brightness, 255);
 #endif
     sysfsval_refresh(self->cached_max_brightness);
@@ -164,8 +164,15 @@ static void
 led_channel_vince_set_value(led_channel_vince_t *self,
                             int value)
 {
-    value = led_util_scale_value(value,
-                                sysfsval_get(self->cached_max_brightness));
+    /*
+     * Since Xiaomi implemented 4095 level brightness in panel dtsi
+     * while caf only have 255 level, we multiply 16 to brightness by default.
+    */
+
+    value *= 16;
+    value = (value < 0) ? 0 : (value < 255) ? value : 255;
+    // value = led_util_scale_value(value,
+    //                             sysfsval_get(self->cached_max_brightness));
 
     /* Ignore blinking requests while brightness is zero. */
     if( value <= 0 )
@@ -256,9 +263,9 @@ led_control_vince_static_probe(led_channel_vince_t *channel)
         // vince (Xiaomi Redmi 5 Plus)
         {
             {
-                .max_brightness = "/sys/class/leds/green/max_brightness",
-                .brightness     = "/sys/class/leds/green/brightness",
-                .blink          = "/sys/class/leds/green/blink",
+                .max_brightness = "/sys/class/leds/red/max_brightness",
+                .brightness     = "/sys/class/leds/red/brightness",
+                .blink          = "/sys/class/leds/red/blink",
             },
             {
                 .max_brightness = "/sys/class/leds/green/max_brightness",
@@ -266,9 +273,9 @@ led_control_vince_static_probe(led_channel_vince_t *channel)
                 .blink          = "/sys/class/leds/green/blink",
             },
             {
-                .max_brightness = "/sys/class/leds/green/max_brightness",
-                .brightness     = "/sys/class/leds/green/brightness",
-                .blink          = "/sys/class/leds/green/blink",
+                .max_brightness = "/sys/class/leds/blue/max_brightness",
+                .brightness     = "/sys/class/leds/blue/brightness",
+                .blink          = "/sys/class/leds/blue/blink",
             },
         },
     };
